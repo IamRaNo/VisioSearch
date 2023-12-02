@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Visio Search</title>
+    <!DOCTYPE html>
+    <html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Your Page Title</title>
+        <style>
+            body {
+                background-image: url('static/background_new.jpg');
+                background-attachment: fixed;
+                background-size: cover;
+                font-family: 'Arial', sans-serif;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                color: #fff;
+                /* Set text color to white */
+            }
+
+            canvas {
+                border: 4px solid #333;
+                margin-top: 20px;
+                border-radius: 10px;
+                height: auto;
+                /* Add border radius for a softer look */
+            }
+
+            input[type="file"] {
+                display: none;
+            }
+
+            label {
+                background-color: #3498db;
+                color: #fff;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin-top: 20px;
+                /* Increase top margin for better spacing */
+                transition: background-color 0.3s;
+            }
+
+            label:hover {
+                background-color: #2980b9;
+            }
+
+            .profiles {
+                display: flex;
+                justify-content: space-around;
+                margin-top: 30px;
+                width: 80%;
+                /* Adjust width for better responsiveness */
+                flex-wrap: wrap;
+                /* Allow profiles to wrap to the next line on smaller screens */
+            }
+
+            .profile {
+                text-align: center;
+                background-color: #fff;
+                border-radius: 8px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+                width: 200px;
+                margin-top: 20px;
+                /* Adjust top margin for better spacing */
+                transition: transform 0.3s;
+                /* Add transition for a smoother hover effect */
+            }
+
+            .profile:hover {
+                transform: scale(1.05);
+                /* Enlarge profile on hover */
+            }
+
+            .profile img {
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                object-fit: cover;
+            }
+
+            h2 {
+                margin-top: 10px;
+                color: #333;
+            }
+
+            p {
+                color: #666;
+            }
+
+            h1 {
+                color: dimgrey;
+                margin-top: 20px;
+                /* Adjust top margin for better spacing */
+            }
+        </style>
+    </head>
+
+<body>
+    <label for="uploadInput">Choose Visio</label>
+    <input id="uploadInput" type="file" />
+    <canvas></canvas>
+    <h1 id="text_element">Click on the Image to Search</h1>
+
+    <div class="profiles">
+        <div class="profile">
+            <img src="static/Ranojoy_Das.jpg" alt="Description">
+            <h2>Ranojoy Das</h2>
+            <p>23000121062</p>
+        </div>
+
+        <div class="profile">
+            <img src="static/Bapan Sarkar.jpg" alt="Profile Picture">
+            <h2>Bapan Sarkar</h2>
+            <p>23000121053</p>
+        </div>
+
+        <div class="profile">
+            <img src="static/Tamal Sarkar.jpg" alt="Profile Picture">
+            <h2>Tamal Sarkar</h2>
+            <p>23000121064</p>
+        </div>
+
+        <div class="profile">
+            <img src="static/Swaralipi Mondal.jpg" alt="Profile Picture">
+            <h2>Swaralipi Mandal</h2>
+            <p>23000121057</p>
+        </div>
+    </div>
+
+    <script>
+        const input = document.getElementById("uploadInput");
+        let selectedBox = null;
+
+        input.addEventListener("change", async (event) => {
+            const data = new FormData();
+            data.append("image_file", event.target.files[0], "image_file");
+            const response = await fetch("/detect", {
+                method: "post",
+                body: data
+            });
+            const boxes = await response.json();
+            draw_image_and_boxes(event.target.files[0], boxes);
+        });
+
+        function draw_image_and_boxes(file, boxes) {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                const canvas = document.querySelector("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+                ctx.strokeStyle = "#fa0606";
+                ctx.lineWidth = 1;
+                ctx.font = "18px Arial, sans-serif";
+
+                canvas.addEventListener('mousemove', (e) => {
+                    const mousePos = getMousePos(canvas, e);
+                    selectedBox = getSelectedBox(mousePos, boxes);
+                    redrawImageAndBoxes(boxes, ctx, img);
+                });
+
+                canvas.addEventListener('mouseout', () => {
+                    selectedBox = null;
+                    redrawImageAndBoxes(boxes, ctx, img);
+                });
+
+                canvas.addEventListener('click', () => {
+                    if (selectedBox) {
+                        const searchQuery = selectedBox[4]; // Assuming label is used as the search query
+                        searchGoogle(searchQuery);
+                    }
+                });
+
+                redrawImageAndBoxes(boxes, ctx, img);
+            };
+        }
+
+        function getMousePos(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function getSelectedBox(mousePos, boxes) {
+            // Iterate over boxes in reverse order to find the topmost box first
+            for (let i = boxes.length - 1; i >= 0; i--) {
+                const [x1, y1, x2, y2] = boxes[i];
+                if (mousePos.x > x1 && mousePos.x < x2 && mousePos.y > y1 && mousePos.y < y2) {
+                    return boxes[i];
+                }
+            }
+            return null;
+        }
+
+        function redrawImageAndBoxes(boxes, ctx, img) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            // Redraw the image
+            ctx.drawImage(img, 0, 0);
+
+            boxes.forEach(([x1, y1, x2, y2, label]) => {
+                ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+                // Draw the label for the selected box
+                if (selectedBox !== null && label === selectedBox[4]) {
+                    const labelHeight = 18;
+                    const labelY = Math.max(y1 - labelHeight, 0); // Adjusted calculation
+
+                    ctx.fillStyle = "#fa0606";
+                    const width = ctx.measureText(label).width;
+                    ctx.fillRect(x1, labelY, width + 10, labelHeight);
+
+                    ctx.fillStyle = "#000000";
+                    ctx.fillText(label, x1, labelY + labelHeight - 5);
+                }
+            });
+        }
+
+        function searchGoogle(query) {
+            // Perform a Google search with the given query
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}+photos`;
+            window.open(searchUrl, "_blank");
+        }
+    </script>
+</body>
+
+</html>
